@@ -1,3 +1,5 @@
+#new commit test
+#second test commit
 import cv2
 import numpy as np
 import time
@@ -47,6 +49,9 @@ imgBall = imgBall[:-350, :-1225]
 
 ball = np.where((imgBall == 233) | (imgBall == 255))
 radius = (max(ball[1]) - min(ball[1]))/2
+
+print("radius: " + str(radius))
+
 meanY = (np.mean(ball[0])/2) + 425/2
 meanX = (np.mean(ball[1])/2) + 1225/2
 
@@ -69,8 +74,13 @@ minYblockade = min(blockadeY)/2 + 175
 maxYblockade = max(blockadeY)/2 + 175
 
 
-#if np.std(blockadeCoords[1]) > 100:
+#Initialize top_bottom_wall 
+#Top_bottom_wall -> true -> the blockade is on the top or bottom wall
+#Top_bottom_wall -> true -> the blockade is on the left or right wall
 top_bottom_wall = False
+
+#X values will be far apart on the red blocakde if they are on the top or bottom wall
+#Checks for top/bottom wall or left/right wall
 if maxXblockade - minXblockade > 100:
     #the border is on the horizontal axis TOP OR BOTTOM
     #(0,100) (200,100) The Y coordinates would remain the same on the x axis
@@ -79,6 +89,7 @@ if maxXblockade - minXblockade > 100:
     If the blockade is on the roof the ROOF BLOCKADE  will always be LESS then Y VALUE of the ball
     If the blockade is on the bottom the BOTTOM BLOCKADE will always be GREATER than the Y VALUE of the ball
     """
+    #Determines top or bottom wall
     if maxYblockade < meanY:
         #topWall
         blockade1 = (minXblockade, maxYblockade)
@@ -97,24 +108,27 @@ else:
     If the blockade is on the left the LEFT BLOCKADE  will always be LESS then X VALUE of the ball
     If the blockade is on the RIGHT the RIGHT BLOCKADE will always be GREATER than the X VALUE of the ball
     """
-
+    #Determines left or right wall
     if maxXblockade < meanX:
+        #Left wall I think
         blockade1 = (maxXblockade, minYblockade)
         blockade2 = (maxXblockade, maxYblockade)
     else:
+        #Right wall I think
         blockade1 = (minXblockade, minYblockade)
         blockade2 = (minXblockade, maxYblockade)
 
 #blockade 1 and blockade 2 are the red border
 
-#converts from degrees to randians
+#Converts from degrees to randians
 def to_radians(angle):
     return angle * (math.pi / 180)
 
-#gives coordinates for launch angle
+#Gives coordinates for launch angle (unit circle conversion)
 def launch_angle(angle):
     return ((math.cos(to_radians(angle))),(math.sin(to_radians(angle))))
 
+#Adjusts to the system. Enter value based on your desire
 def launch_flip_angle(angle):
     if (angle <= 180):
         flip_angle = 180 - angle
@@ -138,6 +152,7 @@ def split_consecutive(lst):
     result.append(sub_list)
     return result
 
+#Finds longest subarray
 def longest_subarray(arrays):
     longest = []
     for array in arrays:
@@ -150,13 +165,16 @@ rightWallX = bottomRightCorner[0]
 topWallY = topLeftCorner[1]
 bottomWallY = bottomRightCorner[1]
 
-#returns coordinates of where the ball is and which direction it will be going upon contact with wall
+#Takes in launch coords (direction of ball's movement (0.5,0.5)), current xPos, current yPos
+#Returns launch coords (direction of ball after bounce), new Xpos, new Ypos upon contact with wall
 def calculate_ball_collision(launch_coords, xPos, yPos):
+    #While X coords and Y coords of ball are within boundaries of the walls keep adjusting the coords until it hits a wall
     while ((xPos > (leftWallX + radius/2) and xPos < (rightWallX - radius/2) and (yPos > (topWallY + radius/2) and yPos < (bottomWallY - radius/2)))):
         xPos += launch_coords[0] 
         yPos -= launch_coords[1]
     
-    #if bounces off the right wall what is the new launch_coords (launch angle is given through launch coords)
+    #Figures out if bounces of top/bottom wall or right/left wall and adjust the launch_coords
+    #Also subtract one movement so the ball is not IN the wall
     if not ((xPos > (leftWallX + radius/2) and xPos < (rightWallX - radius/2))):
         xPos -= launch_coords[0] 
         yPos += launch_coords[1]
@@ -166,10 +184,9 @@ def calculate_ball_collision(launch_coords, xPos, yPos):
         yPos += launch_coords[1]
         launch_coords = (launch_coords[0], -launch_coords[1])
 
-    #returns contact with wall position and direction
-    
     return [launch_coords, xPos, yPos]
 
+#Calculates ball position after x amount of bounces, for ONE angle
 def calculate_ball_position_after_bounces(number_of_bounces, angle, xPos, yPos):
     launch_coords = launch_angle(angle)
     finalXPos = xPos
@@ -184,11 +201,15 @@ def calculate_ball_position_after_bounces(number_of_bounces, angle, xPos, yPos):
         #print("XPos: " + str(collision_details[1]))
         #print("YPos: " + str(collision_details[2]))
         
+        #While ball is still bouncing, when i == numberOfBounces the ball is suppoused to go through the blockade
+        #Meant to check that other bouncehs are avoidiing the blockade
         if not (i == number_of_bounces):
             if top_bottom_wall:
+                #If top/bottom wall and xPos is within range of blockade return 0,0 which wont pass the test later for 'working coords'
                 if (blockade1[0] - 10) < finalXPos < (blockade1[0] + 10):
                     return 0,0
             else:
+                 #If top/bottom wall and yPos is within range of blockade return 0,0 which wont pass the test later for 'working coords'
                 if (blockade1[1] - 10) < finalXPos < (blockade1[1] + 10):
                     return 0,0
         
@@ -199,10 +220,14 @@ xPos = centerBall[0]
 yPos = centerBall[1]
 final_coords_list = []
 
+#Calculates which angles work for ALL 360 angles
 for bounce_angle in range(360):
-    number_of_bounces = 5
+    #Customize number of bounces
+    number_of_bounces = 4
+    #Gets all final coordinate for certain angle
     final_coords = calculate_ball_position_after_bounces(number_of_bounces, bounce_angle, xPos, yPos)
     
+
     if top_bottom_wall:
         #check if y is within 10 pixels and x is within 10 pixels on either side
         if ( ((blockade1[0] + radius) < final_coords[0] < (blockade2[0] - radius)) and (((blockade1[1] - 10) < final_coords[1] < (blockade1[1] + 10))) ):
@@ -224,11 +249,4 @@ launch_coords = launch_flip_angle(final_angle)
 
 pyautogui.click(button='left')
 pyautogui.moveTo(centerBall)
-pyautogui.drag(launch_coords[0]*60, launch_coords[1]*60, 0.5, button='left')
-
-
-#print(f"this is the sd of the x coords: {np.std(blockadeCoords[1])}")
-#print(f"this is the sd of the y coords: {np.std(blockadeCoords[0])}")
-
-#for horizontal border, the x standard deviation > 100 and y standard deviation < 10
-#for veritcal border, the y stanndard deviation > 100 and x sd < 25
+#pyautogui.drag(launch_coords[0]*60, launch_coords[1]*60, 0.5, button='left')
